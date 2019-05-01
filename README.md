@@ -4,7 +4,7 @@ The high level overview is as follows:
 - Include `UKF.h`
 - Define a `UKFModel` class
   - typedefs StateVec, MeasureVec to specify vector formats
-  - functions dF, H: to specify noise models 
+  - functions dF, H: to specify process, measurement models 
   - function init: for initializing the UKF
 - Create a `UKF<UKFModel[, InputType]>` object
 - Call `ukf.update(time_since_last, measurement, input)`
