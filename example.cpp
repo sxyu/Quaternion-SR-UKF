@@ -7,7 +7,7 @@ struct ToyTrackerUKFModel {
     typedef kalman::Vector<0, 3, 1> StateVec; // the layout is: (pos x 3, vel x 3, angularvel x 3, attitude x 4)
 
     /** define measurement vector <scalars, 3-vectors, quaternions> */
-    typedef kalman::Vector<0, 2, 0> MeasureVec; // the layout is: (pos x 3, vel x 3, angularvel x 3, rotation x 4) 
+    typedef kalman::Vector<0, 2, 0> MeasureVec; // the layout is: (gps-pos x 3, gyro-angularvel x 3) 
 
     static void init(kalman::UKF<ToyTrackerUKFModel> & ukf) {
         // auto-initialize state to zero and covariances to diagonal matrices
