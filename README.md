@@ -1,6 +1,15 @@
 ## Usage
 
-Simply include `UKF.h`. Please see `example.cpp` for usage example.
+The high level overview is as follows:
+- Include `UKF.h`
+- Define a `UKFModel` class
+  - typedefs StateVec, MeasureVec to specify vector formats
+  - functions dF, H: to specify noise models 
+  - function init: for initializing the UKF
+- Create a `UKF<UKFModel[, InputType]>` object
+- Call `ukf.update(time_since_last, measurement, input)`
+
+Please see `example.cpp` for usage example.
 
 *Dependency:* Eigen 3
 
@@ -8,7 +17,7 @@ Requires C++ 11 (but not 14).
 
 ## Credits
 
-Parts of this implementation are based on `sfwa/UKF`. Publications referenced include:
+Significant parts of this implementation are based on [sfwa/ukf](https://github.com/sfwa/ukf). Publications referenced include:
 
 - Kraft, "A Quaternion-based Unscented Kalman Filter for Orientation Tracking", 2003
 - Van der Merwe and Wan, "The Square-root Unscented Kalman Filter for state and Parameter-estimation", 2001
@@ -17,4 +26,4 @@ Parts of this implementation are based on `sfwa/UKF`. Publications referenced in
 
 ## License
 
-Apache 2.0
+apache 2.0

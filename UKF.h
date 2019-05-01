@@ -237,7 +237,7 @@ namespace kalman {
             return X;
         }
 
-        /** apply a measurement transformation to the Gaussian,
+        /** apply a measurement transformation to the distribution,
           * provided as class with static method 'H' */
         template<class MeasureDef, class InputType>
         Eigen::MatrixXd applyMeasurement(const Eigen::MatrixXd & X, const InputType & u) {
@@ -365,7 +365,7 @@ namespace kalman {
       *                      void init(UKF) to initialize state, covariances etc.
       * InputType: type of input for process
       * UKFParam: optionally, class with parameters. 
-      * Integrator: optionally, numerical integrator to use. Should be ark::kalman::util::integrator::XYZ
+      * Integrator: optionally, numerical integrator to use. Should be kalman::util::integrator::XYZ
       */
     template<class UKFModel,
              class InputType = Eigen::MatrixXd,
