@@ -62,3 +62,4 @@ int main(int argc, char ** argv) {
     std::cout << ukf.state << "\n" << ukf.stateRootCov << std::endl; // read off state and covariance
     // state now should be close to 125, -10, -50 
     return 0;
+}
