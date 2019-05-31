@@ -18,7 +18,7 @@ namespace kalman {
     template<int NUM_SCALARS, int NUM_3D_VECS = 0, int NUM_QUATERNIONS = 0>
     class Vector : public Eigen::Matrix<double, NUM_SCALARS + NUM_3D_VECS * 3 + NUM_QUATERNIONS * 4, 1>  {
     public:
-        typedef public Eigen::Matrix<double, NUM_SCALARS + NUM_3D_VECS * 3 + NUM_QUATERNIONS * 4, 1> Base;
+        typedef Eigen::Matrix<double, NUM_SCALARS + NUM_3D_VECS * 3 + NUM_QUATERNIONS * 4, 1> Base;
         using Base::Base;
         using Base::operator=;
 
@@ -485,7 +485,7 @@ namespace kalman {
 
             /*
             Calculate the Kalman gain using QR decomposition. This expression
-            implements (S¡¯\(S\P¡¯))¡¯, which is equivalent to (P/S¡¯)/S given in
+            implements (SÂ¡Â¯\(S\PÂ¡Â¯))Â¡Â¯, which is equivalent to (P/SÂ¡Â¯)/S given in
             literature. Eigen's QR decomposition implements a left-division,
             rather than the right-division assumed in the literature.
             */
