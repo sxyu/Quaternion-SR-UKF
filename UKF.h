@@ -1,117 +1,16 @@
 /** SR-UKF with support for Quaternions
+  * From https://github.com/sxyu/Quaternion-SR-UKF
   * Some parts of this implementation are based on https://github.com/sfwa/ukf. 
   * The goals of this implementation (compared to sfwa/ukf) are:
   * - no dependency on C++14 features for compatibility reasons
   * - additional features for avatar tracking
-  * - more consise and efficient, by grouping similar types of state variables allowing for vectorized computations.
-  * The implementation is centered around the UKF class.
+  * - more concise and efficient, by grouping similar types of state variables allowing for vectorized computations.
   */
 #pragma once
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
 namespace kalman {
-    /** KF state/measurement vector representation
-      * vector is segmented into: scalars (1), 3-vectors (3), quaternions(4)
-      * uses the specified integrator to integrate
-      */
-    template<int NUM_SCALARS, int NUM_3D_VECS = 0, int NUM_QUATERNIONS = 0>
-    class Vector : public Eigen::Matrix<double, NUM_SCALARS + NUM_3D_VECS * 3 + NUM_QUATERNIONS * 4, 1>  {
-    public:
-        typedef Eigen::Matrix<double, NUM_SCALARS + NUM_3D_VECS * 3 + NUM_QUATERNIONS * 4, 1> Base;
-        using Base::Base;
-        using Base::operator=;
-
-        static const int _NUM_SCALARS = NUM_SCALARS;
-        static const int _NUM_3D_VECS = NUM_3D_VECS;
-        static const int _NUM_QUATERNIONS = NUM_QUATERNIONS;
-
-        /** size of vector */
-        static const int SIZE             = NUM_QUATERNIONS * 4 + NUM_3D_VECS * 3 + NUM_SCALARS;
-        /** num covariance parameters */
-        static const int COV_SIZE         = NUM_QUATERNIONS * 3 + NUM_3D_VECS * 3 + NUM_SCALARS;
-        /** num sigma points */
-        static const int NUM_SIGMA_POINTS = COV_SIZE * 2 + 1;
-        
-        /** type shorthands */
-        // delta: for updates, which should be COV_SIZE in length (3 parameters only for each quaternion)
-        typedef Eigen::Matrix<double, COV_SIZE, 1> VectorDelta;
-
-        // maps to parts of the vector
-        typedef Eigen::Matrix<double, NUM_SCALARS, 1> ScalarVector;
-        typedef Eigen::Matrix<double, 3, NUM_3D_VECS> SpatialVector;
-        typedef Eigen::Matrix<double, 4, NUM_QUATERNIONS> QuatVector;
-
-        /** get map to all quaternions (unfortunately, as 4xn matrix; see quat()) */
-        Eigen::Map<QuatVector> quats() {
-            Eigen::Map<QuatVector> result(data() + QUAT_START);
-            return result;
-        }
-        /** get map to all quaternions (unfortunately, as 4xn matrix; see quat()) */
-        const Eigen::Map<QuatVector> quats() const {
-            Eigen::Map<const QuatVector> result(data() + QUAT_START);
-            return result;
-        }
-        /** get map to all 3d vectors (as 3xn matrix) */
-        Eigen::Map<SpatialVector> vecs3d() {
-            Eigen::Map<SpatialVector> result(data() + VECS_START);
-            return result;
-        }
-        /** get map to all 3d vectors (as 3xn matrix) */
-        const Eigen::Map<const SpatialVector> vecs3d() const {
-            Eigen::Map<const SpatialVector> result(data() + VECS_START);
-            return result;
-        }
-        /** map to all scalars */
-        Eigen::Map<ScalarVector> scalars() {
-            Eigen::Map<ScalarVector> result(data() + SCALAR_START);
-            return result;
-        }
-        /** map to all scalars */
-        const Eigen::Map<const ScalarVector> scalars() const {
-            Eigen::Map<const ScalarVector> result(data() + SCALAR_START);
-            return result;
-        }
-        /* get a quaternion parameter at the given index (quat.col(idx), but as a quaternion) */
-        Eigen::Map<Eigen::Quaterniond> quat(int idx) {
-            Eigen::Map<Eigen::Quaterniond> quatMap(data() + QUAT_START + 4 * idx);
-            return quatMap;
-        }
-
-        /* get a quaternion parameter at the given index (quat.col(idx), but as a quaternion) */
-        const Eigen::Map<const Eigen::Quaterniond> quat(int idx) const {
-            Eigen::Map<const Eigen::Quaterniond> quatMap(data() + QUAT_START + 4 * idx);
-            return quatMap;
-        }
-
-        /** Update the state vector using a delta vector,
-         * where rodrigues vectors are computed using the given params. */
-        template<class Params>
-        void applyDelta(const VectorDelta & delta) {
-            head<QUAT_START>() += delta.template head<QUAT_START>();
-            for (int i = 0; i < NUM_QUATERNIONS; ++i) {
-                quat(i) = kalman::util::rotationVectorToQuaternion<Params>(delta.template segment<3>(QUAT_START + 3 * i))
-                    * quat(i);
-            }
-        }
-
-        /** Compute innovation: actual - predicted difference */
-        static Vector innovation(const Vector & actual, const Vector & predict) {
-            Vector sv;
-            sv.head(QUAT_START) = actual.head(QUAT_START) - predict.head(QUAT_START);
-            /** for quaternions, use rotation between */
-            for (int i = 0; i < NUM_QUATERNIONS; ++i) {
-                sv.quat(i) = actual.quat(i) * predict.quat(i).inverse();
-            }
-            return sv;
-        }
-
-        /** start positions of data blocks */
-        static const int SCALAR_START = 0;
-        static const int VECS_START = NUM_SCALARS;
-        static const int QUAT_START = NUM_SCALARS + NUM_3D_VECS * 3;
-    }; // Vector
-
     namespace util {
         /** convert a rotation vector to a quaternion */
         template<class Params>
@@ -161,12 +60,12 @@ namespace kalman {
             class RK4 {
             public:
                 template <class Derivative, class InputType>
-                static typename Derivative::StateVec integrate(double delta, typename Derivative::StateVec & state,
+                static typename Derivative::StateVec integrate(double delta, const typename Derivative::StateVec & state,
                                                                const InputType & u) {
                     typename Derivative::StateVec a = Derivative::dF(state, u);
-                    typename Derivative::StateVec b = Derivative::dF(Derivative::StateVec(state + 0.5 * delta * a), u);
-                    typename Derivative::StateVec c = Derivative::dF(Derivative::StateVec(state + 0.5 * delta * b), u);
-                    typename Derivative::StateVec d = Derivative::dF(Derivative::StateVec(state + delta * c), u);
+                    typename Derivative::StateVec b = Derivative::dF(typename Derivative::StateVec(state + 0.5 * delta * a), u);
+                    typename Derivative::StateVec c = Derivative::dF(typename Derivative::StateVec(state + 0.5 * delta * b), u);
+                    typename Derivative::StateVec d = Derivative::dF(typename Derivative::StateVec(state + delta * c), u);
                     return state + (delta / 6.0) * (a + (b * 2.0) + (c * 2.0) + d);
                 }
             };
@@ -175,7 +74,7 @@ namespace kalman {
             class Heun {
             public:
                 template <class Derivative, class InputType>
-                static typename Derivative::StateVec integrate(double delta, typename Derivative::StateVec& state,
+                static typename Derivative::StateVec integrate(double delta, const typename Derivative::StateVec& state,
                                                                const InputType & u) {
                     typename Derivative::StateVec initial = Derivative::dF(state, u);
                     typename Derivative::StateVec predictor = state + delta * initial;
@@ -187,7 +86,7 @@ namespace kalman {
             class Euler {
                 public:
                 template <class Derivative, class InputType>
-                static typename Derivative::StateVec integrate(double delta, typename Derivative::StateVec& state,
+                static typename Derivative::StateVec integrate(double delta, const typename Derivative::StateVec& state,
                                                                const InputType & u) {
                     return state + delta * Derivative::dF(state, u);
                 }
@@ -195,14 +94,134 @@ namespace kalman {
         }
     }
 
+    /** KF state/measurement vector representation
+      * vector is segmented into: scalars (1), 3-vectors (3), quaternions(4)
+      * uses the specified integrator to integrate
+      */
+    template<int NUM_SCALARS, int NUM_3D_VECS = 0, int NUM_QUATERNIONS = 0>
+    class Vector : public Eigen::Matrix<double, NUM_SCALARS + NUM_3D_VECS * 3 + NUM_QUATERNIONS * 4, 1>  {
+    public:
+        typedef Eigen::Matrix<double, NUM_SCALARS + NUM_3D_VECS * 3 + NUM_QUATERNIONS * 4, 1> Base;
+        using Base::Base;
+        using Base::operator=;
+
+        static const int _NUM_SCALARS = NUM_SCALARS;
+        static const int _NUM_3D_VECS = NUM_3D_VECS;
+        static const int _NUM_QUATERNIONS = NUM_QUATERNIONS;
+
+        /** size of vector */
+        static const int SIZE             = NUM_QUATERNIONS * 4 + NUM_3D_VECS * 3 + NUM_SCALARS;
+        /** num covariance parameters */
+        static const int COV_SIZE         = NUM_QUATERNIONS * 3 + NUM_3D_VECS * 3 + NUM_SCALARS;
+        /** num sigma points */
+        static const int NUM_SIGMA_POINTS = COV_SIZE * 2 + 1;
+        
+        /** type shorthands */
+        // delta: for updates, which should be COV_SIZE in length (3 parameters only for each quaternion)
+        typedef Eigen::Matrix<double, COV_SIZE, 1> VectorDelta;
+
+        // maps to parts of the vector
+        typedef Eigen::Matrix<double, NUM_SCALARS, 1> ScalarVector;
+        typedef Eigen::Matrix<double, 3, NUM_3D_VECS> SpatialVector;
+        typedef Eigen::Matrix<double, 4, NUM_QUATERNIONS> QuatVector;
+
+        /** get map to all quaternions (unfortunately, as 4xn matrix; see quat()) */
+        Eigen::Map<QuatVector> quats() {
+            Eigen::Map<QuatVector> result(this->data() + QUAT_START);
+            return result;
+        }
+        /** get map to all quaternions (unfortunately, as 4xn matrix; see quat()) */
+        const Eigen::Map<QuatVector> quats() const {
+            Eigen::Map<const QuatVector> result(this->data() + QUAT_START);
+            return result;
+        }
+        /** get map to all 3d vectors (as 3xn matrix) */
+        Eigen::Map<SpatialVector> vecs3d() {
+            Eigen::Map<SpatialVector> result(this->data() + VECS_START);
+            return result;
+        }
+        /** get map to all 3d vectors (as 3xn matrix) */
+        const Eigen::Map<const SpatialVector> vecs3d() const {
+            Eigen::Map<const SpatialVector> result(this->data() + VECS_START);
+            return result;
+        }
+        /** map to all scalars */
+        Eigen::Map<ScalarVector> scalars() {
+            Eigen::Map<ScalarVector> result(this->data() + SCALAR_START);
+            return result;
+        }
+        /** map to all scalars */
+        const Eigen::Map<const ScalarVector> scalars() const {
+            Eigen::Map<const ScalarVector> result(this->data() + SCALAR_START);
+            return result;
+        }
+        /* get a quaternion parameter at the given index (quat.col(idx), but as a quaternion) */
+        Eigen::Map<Eigen::Quaterniond> quat(int idx) {
+            Eigen::Map<Eigen::Quaterniond> quatMap(this->data() + QUAT_START + 4 * idx);
+            return quatMap;
+        }
+
+        /* get a quaternion parameter at the given index (quat.col(idx), but as a quaternion) */
+        const Eigen::Map<const Eigen::Quaterniond> quat(int idx) const {
+            Eigen::Map<const Eigen::Quaterniond> quatMap(this->data() + QUAT_START + 4 * idx);
+            return quatMap;
+        }
+
+        /** Update the state vector using a delta vector,
+         * where rodrigues vectors are computed using the given params. */
+        template<class Params>
+        void applyDelta(const VectorDelta & delta) {
+            this->template head<QUAT_START>() += delta.template head<QUAT_START>();
+            for (int i = 0; i < NUM_QUATERNIONS; ++i) {
+                quat(i) = kalman::util::rotationVectorToQuaternion<Params>(delta.template segment<3>(QUAT_START + 3 * i))
+                    * quat(i);
+            }
+        }
+
+        /** Compute innovation: actual - predicted difference */
+        static Vector innovation(const Vector & actual, const Vector & predict) {
+            Vector sv;
+            sv.head(QUAT_START) = actual.head(QUAT_START) - predict.head(QUAT_START);
+            /** for quaternions, use rotation between */
+            for (int i = 0; i < NUM_QUATERNIONS; ++i) {
+                sv.quat(i) = actual.quat(i) * predict.quat(i).inverse();
+            }
+            return sv;
+        }
+
+        /** start positions of data blocks */
+        static const int SCALAR_START = 0;
+        static const int VECS_START = NUM_SCALARS;
+        static const int QUAT_START = NUM_SCALARS + NUM_3D_VECS * 3;
+    }; // Vector
+    
+    // required namespace-scope declarations to avoid linker error
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::_NUM_SCALARS;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::_NUM_3D_VECS;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::_NUM_QUATERNIONS;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::SIZE;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::COV_SIZE;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::NUM_SIGMA_POINTS;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::SCALAR_START;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::VECS_START;
+    template<int NUM_SCALARS, int NUM_3D_VECS, int NUM_QUATERNIONS>
+        const int Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>::QUAT_START;
 
     /** Methods for performing unscented transform and manipulating sigma points */
     namespace unscented {
         /** perform unscented transform: computes sigma points from the input Gaussian */
         template<class Params, class VecType>
-        Eigen::MatrixXd transform(VecType & mean, Eigen::MatrixXd & S) {
+        Eigen::MatrixXd transform(VecType & mean, const Eigen::MatrixXd & S) {
             Eigen::MatrixXd X(VecType::SIZE, VecType::NUM_SIGMA_POINTS);
-            auto vecs = mean.head<VecType::QUAT_START>();
+            auto vecs = mean.template head<VecType::QUAT_START>();
             auto covs = S.template topLeftCorner<VecType::QUAT_START, VecType::COV_SIZE>();
             X.template topLeftCorner<VecType::QUAT_START, 1>() = vecs;
             X.template block<VecType::QUAT_START, VecType::COV_SIZE>(0, 1) = covs.colwise() + vecs;
@@ -237,7 +256,7 @@ namespace kalman {
             return X;
         }
 
-        /** apply a measurement transformation to the distribution,
+        /** apply a measurement transformation to the Gaussian,
           * provided as class with static method 'H' */
         template<class MeasureDef, class InputType>
         Eigen::MatrixXd applyMeasurement(const Eigen::MatrixXd & X, const InputType & u) {
@@ -254,7 +273,7 @@ namespace kalman {
         template<class ProcessDef, class InputType, class Integrator = kalman::util::integrator::RK4>
         void applyProcessInPlace(Eigen::MatrixXd & X, const InputType & u, double delta_t) {
             for (int i = 0; i < ProcessDef::StateVec::NUM_SIGMA_POINTS; ++i) {
-                X.col(i) = Integrator::integrate<ProcessDef, InputType>(delta_t, ProcessDef::StateVec(X.col(i)), u);
+                X.col(i) = Integrator::template integrate<ProcessDef, InputType>(delta_t, typename ProcessDef::StateVec(X.col(i)), u);
             }
         }
 
@@ -289,7 +308,7 @@ namespace kalman {
             // recover 
             Eigen::MatrixXd wPrime(SigmaVecType::COV_SIZE, StateVecType::NUM_SIGMA_POINTS);
             wPrime.template topRows<SigmaVecType::QUAT_START>() = X.template topRows<SigmaVecType::QUAT_START>().colwise() -
-                init_mean.head<SigmaVecType::QUAT_START>();
+                init_mean.template head<SigmaVecType::QUAT_START>();
 
             /* calculate quaternion deltas using Kraft, equation 45 */
             for (int i = 0; i < StateVecType::NUM_SIGMA_POINTS; ++i) {
@@ -355,6 +374,17 @@ namespace kalman {
         static constexpr double sigma_WMI = 1.0 / (2.0 * (UKFModel::StateVec::COV_SIZE + lambda));
         static constexpr double sigma_WCI = sigma_WMI;
     };
+    
+    // required namespace-scope declarations to avoid linker error
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::alphaSquared;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::beta;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::lambda;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::MRP_A;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::MRP_F;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::sigma_WM0;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::sigma_WC0;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::sigma_WMI;
+    template <class UKFModel> constexpr double DefaultUKFParams<UKFModel>::sigma_WCI;
 
     /** Square Root unscented Kalman Filter for robust pose estimation,
       * with support for quaternions and non-identical time steps
@@ -365,7 +395,7 @@ namespace kalman {
       *                      void init(UKF) to initialize state, covariances etc.
       * InputType: type of input for process
       * UKFParam: optionally, class with parameters. 
-      * Integrator: optionally, numerical integrator to use. Should be kalman::util::integrator::XYZ
+      * Integrator: optionally, numerical integrator to use. Should be ark::kalman::util::integrator::XYZ
       */
     template<class UKFModel,
              class InputType = Eigen::MatrixXd,
@@ -406,7 +436,7 @@ namespace kalman {
         void update(double delta_t, const MeasureVec & z, const InputType & input) {
             // 'a priori' step
             /* calc sigma points */
-            sigmaPoints = unscented::transform<UKFParams, StateVec>(state,
+            sigmaPoints = unscented::template transform<UKFParams, StateVec>(state,
                 Eigen::MatrixXd(stateRootCov * std::sqrt(StateVec::COV_SIZE + UKFParams::lambda)));
 
             /* Propagate the sigma points through the process model. */
@@ -438,7 +468,7 @@ namespace kalman {
             stateRootCov.transposeInPlace();
 
             /* Recalculate the sigma points using the a priori covariance. */
-            sigmaPoints = unscented::transform<UKFParams, StateVec>(state,
+            sigmaPoints = unscented::template transform<UKFParams, StateVec>(state,
                 Eigen::MatrixXd(stateRootCov * std::sqrt(StateVec::COV_SIZE + UKFParams::lambda)));
             wPrime = unscented::computeDeltas<UKFParams, StateVec>(sigmaPoints, state);
 
@@ -501,7 +531,7 @@ namespace kalman {
             typename StateVec::VectorDelta updateDelta = kalmanGain * innovation;
 
             // Apply the update delta to the state vector.
-            state.applyDelta<UKFParams>(updateDelta);
+            state.template applyDelta<UKFParams>(updateDelta);
 
             // Reuse the crossCorr variable, since we don't need it again.
             crossCorr.noalias() = kalmanGain * innovationRootCov;
