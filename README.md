@@ -15,6 +15,14 @@ Please see `example.cpp` for usage example.
 
 Requires C++ 11 (but not 14).
 
+## To Compile Example
+
+- Install CMake
+- `mkdir build && cd build`
+- `cmake ..`
+  - if this doesn't find Eigen automatically, you may need `cmake .. -DEIGEN_INCLUDE_DIRS="path/to/eigen/includes"`
+- `cmake --build . --config Release`
+
 ## Credits
 
 Significant parts of this implementation are based on [sfwa/ukf](https://github.com/sfwa/ukf). Publications referenced include:

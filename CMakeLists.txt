@@ -31,7 +31,7 @@ else()
 endif()
 
 if ( CMAKE_COMPILER_IS_GNUCXX )
-    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wno-deprecated-declarations -O3 -g" )
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wno-deprecated-declarations -Wno-attributes -O3 -g" )
 endif ( CMAKE_COMPILER_IS_GNUCXX )
 
 if ( NOT DEFINED EIGEN_INCLUDE_DIRS )
