@@ -3,10 +3,11 @@
 The high level overview is as follows:
 - Include `UKF.h`
 - Define a `UKFModel` class
-  - typedefs StateVec, MeasureVec to specify vector formats
-  - functions dF, H: to specify process, measurement models 
-  - function init: for initializing the UKF
+  - typedefs `StateVec`, `MeasureVec` to specify vector formats
+  - functions `dF`, `H`: to specify process, measurement models 
+  - function `init`: for initializing the UKF
 - Create a `UKF<UKFModel[, InputType]>` object
+  - All template arguments possible: UKF<UKFModel, InputType = Eigen::MatrixXd, UKFParams = DefaultUKFParams<UKFModel>, Integrator = kalman::util::integrator::RK4>
 - Call `ukf.update(time_since_last, measurement, input)`
 
 Please see `example.cpp` for usage example.
