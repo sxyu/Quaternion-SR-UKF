@@ -33,19 +33,9 @@ After updates, you may retrieve the state and root covariance of the filter by a
 
 State and measurement vectors are implemented in the `Vector<NUM_SCALARS, NUM_3D_VECS, NUM_QUATERNIONS>` class. The template arguments specify the number of scalars, 3-vectors and quaternions in the state vector. Note that 3D vecs are unnecessary (could add three scalars) and are included for cleanness. `Vector` is actually a subclass of the `Eigen::Matrix` class and thus all computations with `Vector` are internally handled by Eigen.  
 
-Please use typedefs in the `UKFModel` definition to specify state and measurement vector formats. For example:
-
-```cpp
-    /** define state vector: <scalars, 3-vectors, quaternions> */
-    typedef kalman::Vector<0, 3, 1> StateVec; // the layout is: (pos x 3, vel x 3, angularvel x 3, attitude x 4)
-
-    /** define measurement vector <scalars, 3-vectors, quaternions> */
-    typedef kalman::Vector<0, 2, 0> MeasureVec; // the layout is: (gps-pos x 3, gyro-angularvel x 3) 
-```
-
 ### Model Definition
 
-For maximum efficiency, the UKF model is defined using a class with only static members which allows the functions to be statically linked. You must define this class and pass it as the first template argument for the `UKF` class.
+The UKF model definition is a class with only static members. This helps to improve efficiency. You should create this class according to your requirements and pass it as the first template argument for the `UKF` class.
 
 **State and Measurement Vector Definitions**
 Simply `typedef Vector<x, y, z> StateVec` and `typedef Vector<x, y, z> MeasureVec` in the model definition, where x,y,z are set appropriately to the numbers of scalars, 3-vectors, and quaternions.
